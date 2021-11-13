@@ -1,0 +1,33 @@
+[package]
+name = "rtic-oled-ui"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nb = "1.0.0"
+cortex-m-rtic = "0.6.0-rc.4"
+systick-monotonic = "0.1.0-rc.2"
+cortex-m = "0.7.3"
+panic-semihosting = "0.5.6"
+embedded-hal = "0.2.4"
+sh1106 = "0.3.4"
+embedded-graphics = "0.6.2"
+heapless = "0.6.1"
+# portable = { path = "portable" }
+
+[dependencies.stm32f1xx-hal]
+version = "0.7.0"
+features = ["rt", "stm32f103", "medium"]
+
+[profile.dev]
+opt-level = 1
+lto = true
+incremental = false
+
+[profile.release]
+lto = true
+incremental = false
+opt-level = "z"
+debug = true
