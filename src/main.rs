@@ -114,9 +114,10 @@ mod app {
         // Periodic ever 1 seconds
         cx.local.led.toggle().unwrap();
 
-        for i in 0..50 {
-            for j in 0..50 {
-                cx.local.display.set_pixel(i, j, 1);
+        let (w, h) = cx.local.display.get_dimensions();
+        for i in 0..w {
+            for j in 0..h {
+                cx.local.display.set_pixel(i as u32, j as u32, 1);
             }
         }
         cx.local.display.flush().unwrap();
