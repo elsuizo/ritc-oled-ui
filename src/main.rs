@@ -11,20 +11,18 @@
 #![no_main]
 #![no_std]
 
+mod buttons;
+mod ui;
 use panic_semihosting as _;
 use rtic::app;
 
 #[app(device = stm32f1xx_hal::pac, dispatchers = [EXTI2])]
 mod app {
+    use crate::buttons::Button;
     use stm32f1xx_hal::gpio::State;
     use stm32f1xx_hal::{gpio, pac, prelude::*};
     use systick_monotonic::*;
 
-    use embedded_graphics::{
-        image::{Image, ImageRawLE},
-        pixelcolor::BinaryColor,
-        prelude::*,
-    };
     use pac::I2C1;
     use sh1106::{prelude::*, Builder};
     use stm32f1xx_hal::{
@@ -38,6 +36,7 @@ mod app {
     type Led = gpio::gpioc::PC13<gpio::Output<gpio::PushPull>>;
     type Sda = gpio::gpiob::PB9<gpio::Alternate<gpio::OpenDrain>>;
     type Scl = gpio::gpiob::PB8<gpio::Alternate<gpio::OpenDrain>>;
+    type Button0Pin = gpio::gpioa::PA6<gpio::Input<gpio::PullUp>>;
     type OledDisplay = GraphicsMode<I2cInterface<BlockingI2c<I2C1, (Scl, Sda)>>>;
     // A monotonic timer to enable scheduling in RTIC
     #[monotonic(binds = SysTick, default = true)]
@@ -48,7 +47,9 @@ mod app {
     //-------------------------------------------------------------------------
     // Resources shared between tasks
     #[shared]
-    struct Shared {}
+    struct Shared {
+        button0: Button<Button0Pin>,
+    }
 
     #[local]
     struct Local {
@@ -69,6 +70,7 @@ mod app {
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
         let mut afio = cx.device.AFIO.constrain(&mut rcc.apb2);
 
+        let mut gpioa = cx.device.GPIOA.split(&mut rcc.apb2);
         let mut gpiob = cx.device.GPIOB.split(&mut rcc.apb2);
         let mut gpioc = cx.device.GPIOC.split(&mut rcc.apb2);
         let led = gpioc
@@ -102,24 +104,28 @@ mod app {
         let systick = cx.core.SYST;
         let mono = Systick::new(systick, 8_000_000);
 
+        let button0_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
         // Spawn the task `blinky` 1 second after `init` finishes, this is enabled
         // by the `#[monotonic(..)]` above
         blinky::spawn_after(1.secs()).unwrap();
 
-        (Shared {}, Local { led, display }, init::Monotonics(mono))
+        (
+            Shared {
+                button0: Button::new(button0_pin),
+            },
+            Local { led, display },
+            init::Monotonics(mono),
+        )
     }
 
     #[task(local = [led, display])]
     fn blinky(cx: blinky::Context) {
+        use crate::ui::draw_text;
         // Periodic ever 1 seconds
         cx.local.led.toggle().unwrap();
 
-        let (w, h) = cx.local.display.get_dimensions();
-        for i in 0..w {
-            for j in 0..h {
-                cx.local.display.set_pixel(i as u32, j as u32, 1);
-            }
-        }
+        // let (w, h) = cx.local.display.get_dimensions();
+        draw_text(cx.local.display, "Martin Noblia", 0, 24).unwrap();
         cx.local.display.flush().unwrap();
         blinky::spawn_after(1.secs()).unwrap();
     }
