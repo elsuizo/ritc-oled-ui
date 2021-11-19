@@ -5,6 +5,9 @@
 // - [X] Periodic task blinky compile and working
 // - [ ] include the oled display
 // - [ ] do the menu with buttons
+//  - [ ] read the buttons
+//  - [ ] generate a state machine with the menu states
+// - [ ] enable UART debug
 //----------------------------------------------------------------------------
 #![deny(unsafe_code)]
 // #![deny(warnings)]
@@ -12,6 +15,7 @@
 #![no_std]
 
 mod buttons;
+mod io;
 mod ui;
 use panic_semihosting as _;
 use rtic::app;
@@ -19,6 +23,7 @@ use rtic::app;
 #[app(device = stm32f1xx_hal::pac, dispatchers = [EXTI2])]
 mod app {
     use crate::buttons::Button;
+    use crate::io::Logger;
     use stm32f1xx_hal::gpio::State;
     use stm32f1xx_hal::{gpio, pac, prelude::*};
     use systick_monotonic::*;
@@ -28,6 +33,7 @@ mod app {
     use stm32f1xx_hal::{
         i2c::{BlockingI2c, DutyCycle, Mode},
         prelude::*,
+        serial::{self, Config, Serial},
         stm32,
     };
     //-------------------------------------------------------------------------
@@ -49,6 +55,8 @@ mod app {
     #[shared]
     struct Shared {
         button0: Button<Button0Pin>,
+        logger: Logger,
+        counter: usize,
     }
 
     #[local]
@@ -57,6 +65,20 @@ mod app {
         display: OledDisplay,
     }
 
+    //-------------------------------------------------------------------------
+    //                        tasks
+    //-------------------------------------------------------------------------
+
+    #[idle(shared = [counter])]
+    fn idle(ctx: idle::Context) -> ! {
+        let idle::SharedResources { counter } = ctx.shared;
+        counter.lock(|&mut c| {
+            c += 1;
+        });
+        loop {
+            continue;
+        }
+    }
     //-------------------------------------------------------------------------
     //                        initialization fn
     //-------------------------------------------------------------------------
@@ -77,6 +99,20 @@ mod app {
             .pc13
             .into_push_pull_output_with_state(&mut gpioc.crh, State::Low);
 
+        // USART1
+        let tx = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
+        let rx = gpiob.pb7;
+        let mut serial = Serial::usart1(
+            cx.device.USART1,
+            (tx, rx),
+            &mut afio.mapr,
+            Config::default().baudrate(9600.bps()),
+            clocks,
+            &mut rcc.apb2,
+        );
+        let tx = serial.split().0;
+        let mut logger = Logger::new(tx);
+        // oled display pins
         let scl = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
         let sda = gpiob.pb9.into_alternate_open_drain(&mut gpiob.crh);
         let i2c = BlockingI2c::i2c1(
@@ -112,13 +148,15 @@ mod app {
         (
             Shared {
                 button0: Button::new(button0_pin),
+                logger,
+                counter: 0,
             },
             Local { led, display },
             init::Monotonics(mono),
         )
     }
 
-    #[task(local = [led, display])]
+    #[task(local = [led, display], shared = [logger, counter])]
     fn blinky(cx: blinky::Context) {
         use crate::ui::draw_text;
         // Periodic ever 1 seconds
@@ -127,6 +165,7 @@ mod app {
         // let (w, h) = cx.local.display.get_dimensions();
         draw_text(cx.local.display, "Martin Noblia", 0, 24).unwrap();
         cx.local.display.flush().unwrap();
+        // cx.shared.logger()
         blinky::spawn_after(1.secs()).unwrap();
     }
 }
