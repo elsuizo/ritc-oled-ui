@@ -55,7 +55,6 @@ mod app {
     #[shared]
     struct Shared {
         button0: Button<Button0Pin>,
-        logger: Logger,
         counter: usize,
     }
 
@@ -63,6 +62,7 @@ mod app {
     struct Local {
         led: Led,
         display: OledDisplay,
+        logger: Logger,
     }
 
     //-------------------------------------------------------------------------
@@ -71,14 +71,15 @@ mod app {
 
     #[idle(shared = [counter])]
     fn idle(ctx: idle::Context) -> ! {
-        let idle::SharedResources { counter } = ctx.shared;
-        counter.lock(|&mut c| {
-            c += 1;
-        });
+        let idle::SharedResources { mut counter } = ctx.shared;
         loop {
+            counter.lock(move |mut c| {
+                *c += 1;
+            });
             continue;
         }
     }
+
     //-------------------------------------------------------------------------
     //                        initialization fn
     //-------------------------------------------------------------------------
@@ -148,24 +149,43 @@ mod app {
         (
             Shared {
                 button0: Button::new(button0_pin),
-                logger,
                 counter: 0,
             },
-            Local { led, display },
+            Local {
+                led,
+                display,
+                logger,
+            },
             init::Monotonics(mono),
         )
     }
 
-    #[task(local = [led, display], shared = [logger, counter])]
+    #[task(local = [led, display, logger], shared = [counter])]
     fn blinky(cx: blinky::Context) {
         use crate::ui::draw_text;
+        use core::fmt::Write;
+        use heapless::String;
         // Periodic ever 1 seconds
+        let blinky::SharedResources { mut counter, .. } = cx.shared;
+        let mut out: String<10> = String::new();
+        let string = "hola";
+        (counter).lock(|c: &mut usize| {
+            write!(&mut out, "{}", c).unwrap();
+        });
+        // let blinky::SharedResources {
+        //     counter, logger, ..
+        // } = cx.shared;
+        // counter.lock(move |mut c| {
+        //     write!(&mut out, "{}", counter).unwrap();
+        // });
         cx.local.led.toggle().unwrap();
 
+        // let counter = cx.shared.counter;
+        // write!(&mut out, "{}", counter).unwrap();
         // let (w, h) = cx.local.display.get_dimensions();
         draw_text(cx.local.display, "Martin Noblia", 0, 24).unwrap();
         cx.local.display.flush().unwrap();
-        // cx.shared.logger()
+        cx.local.logger.log(&out);
         blinky::spawn_after(1.secs()).unwrap();
     }
 }
