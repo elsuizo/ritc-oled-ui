@@ -2,7 +2,7 @@ use core::convert::Infallible;
 /// Button primitives and implementations
 use embedded_hal::digital::v2::InputPin;
 
-enum PinState {
+pub enum PinState {
     PinUp,
     PinDown,
     Nothing,

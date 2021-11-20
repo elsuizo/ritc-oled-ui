@@ -54,30 +54,15 @@ mod app {
     // Resources shared between tasks
     #[shared]
     struct Shared {
-        button0: Button<Button0Pin>,
         counter: usize,
     }
 
     #[local]
     struct Local {
+        button0: Button<Button0Pin>,
         led: Led,
         display: OledDisplay,
         logger: Logger,
-    }
-
-    //-------------------------------------------------------------------------
-    //                        tasks
-    //-------------------------------------------------------------------------
-
-    #[idle(shared = [counter])]
-    fn idle(ctx: idle::Context) -> ! {
-        let idle::SharedResources { mut counter } = ctx.shared;
-        loop {
-            counter.lock(move |mut c| {
-                *c += 1;
-            });
-            continue;
-        }
     }
 
     //-------------------------------------------------------------------------
@@ -147,11 +132,9 @@ mod app {
         blinky::spawn_after(1.secs()).unwrap();
 
         (
-            Shared {
-                button0: Button::new(button0_pin),
-                counter: 0,
-            },
+            Shared { counter: 0 },
             Local {
+                button0: Button::new(button0_pin),
                 led,
                 display,
                 logger,
@@ -159,33 +142,37 @@ mod app {
             init::Monotonics(mono),
         )
     }
+    //-------------------------------------------------------------------------
+    //                        tasks
+    //-------------------------------------------------------------------------
 
-    #[task(local = [led, display, logger], shared = [counter])]
-    fn blinky(cx: blinky::Context) {
+    #[idle(shared = [counter])]
+    fn idle(mut ctx: idle::Context) -> ! {
+        let idle::SharedResources { mut counter } = ctx.shared;
+        loop {
+            counter.lock(|c| {
+                *c += 1;
+            });
+            continue;
+        }
+    }
+
+    #[task(local = [display, button0])]
+    fn react(cx: react::Context) {
         use crate::ui::draw_text;
+        if let crate::buttons::Event::Pressed = cx.local.button0.poll() {
+            cx.local.display.flush().unwrap();
+            draw_text(cx.local.display, "button pressed!!!", 0, 24).unwrap();
+        }
+    }
+
+    #[task(local = [led, logger], shared = [counter])]
+    fn blinky(cx: blinky::Context) {
         use core::fmt::Write;
         use heapless::String;
         // Periodic ever 1 seconds
-        let blinky::SharedResources { mut counter, .. } = cx.shared;
-        let mut out: String<10> = String::new();
-        let string = "hola";
-        (counter).lock(|c: &mut usize| {
-            write!(&mut out, "{}", c).unwrap();
-        });
-        // let blinky::SharedResources {
-        //     counter, logger, ..
-        // } = cx.shared;
-        // counter.lock(move |mut c| {
-        //     write!(&mut out, "{}", counter).unwrap();
-        // });
         cx.local.led.toggle().unwrap();
 
-        // let counter = cx.shared.counter;
-        // write!(&mut out, "{}", counter).unwrap();
-        // let (w, h) = cx.local.display.get_dimensions();
-        draw_text(cx.local.display, "Martin Noblia", 0, 24).unwrap();
-        cx.local.display.flush().unwrap();
-        cx.local.logger.log(&out);
         blinky::spawn_after(1.secs()).unwrap();
     }
 }
