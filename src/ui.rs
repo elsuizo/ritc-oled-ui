@@ -8,7 +8,7 @@ use embedded_graphics::{
 };
 
 pub const DISPLAY_WIDTH: i32 = 128;
-pub const DISPLAY_HEIGHT: i32 = 128;
+pub const DISPLAY_HEIGHT: i32 = DISPLAY_WIDTH / 2;
 const X_PAD: i32 = 1;
 const Y_PAD: i32 = 2;
 const CHAR_HEIGHT: i32 = 14;

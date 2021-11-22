@@ -172,7 +172,7 @@ mod app {
         let blinky::SharedResources { mut led } = cx.shared;
         led.lock(|l| l.toggle().ok());
         if *cx.local.y < crate::ui::DISPLAY_HEIGHT {
-            *cx.local.y += 10;
+            *cx.local.y += 5;
         } else {
             *cx.local.y = 0;
         }
