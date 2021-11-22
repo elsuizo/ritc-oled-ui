@@ -39,11 +39,11 @@ impl<P: InputPin<Error = Infallible>> Button<P> {
             (Low(counter), false) => *counter = 0,
         }
         match self.state {
-            High(cnt) if cnt >= 30 => {
+            High(cnt) if cnt >= 10 => {
                 self.state = Low(0);
                 PinState::PinUp
             }
-            Low(cnt) if cnt >= 30 => {
+            Low(cnt) if cnt >= 10 => {
                 self.state = High(0);
                 PinState::PinDown
             }

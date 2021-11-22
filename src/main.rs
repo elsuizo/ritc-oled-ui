@@ -149,7 +149,7 @@ mod app {
     //                        tasks
     //-------------------------------------------------------------------------
     #[idle]
-    fn idle(ctx: idle::Context) -> ! {
+    fn idle(_: idle::Context) -> ! {
         loop {
             continue;
         }
@@ -157,20 +157,29 @@ mod app {
 
     // NOTE(elsuizo:2021-11-21): remember that the method set_low() needs the trait: `use embedded_hal::digital::v2::OutputPin;`
     // to be used!!!
-    #[task(local = [display, button0], shared = [led])]
+    #[task(local = [button0], shared = [led])]
     fn react(cx: react::Context) {
         let react::SharedResources { mut led } = cx.shared;
         if let crate::buttons::PinState::PinUp = cx.local.button0.polling() {
-            led.lock(|l| l.set_low().ok());
+            led.lock(|l| l.toggle().ok());
         }
     }
 
     // NOTE(elsuizo:2021-11-21): when you have a shared Resources we need lock the variable for
     // security reasons because we need to avoid data races!!!
-    #[task(local = [logger], shared = [led])]
+    #[task(local = [display, x:i32 = 0, y:i32 = 0], shared = [led])]
     fn blinky(cx: blinky::Context) {
         let blinky::SharedResources { mut led } = cx.shared;
         led.lock(|l| l.toggle().ok());
+        if *cx.local.y < crate::ui::DISPLAY_HEIGHT {
+            *cx.local.y += 10;
+        } else {
+            *cx.local.y = 0;
+        }
+        // *cx.local.x += 1;
+        crate::ui::draw_text(cx.local.display, "Martin Noblia", *cx.local.x, *cx.local.y).ok();
+        cx.local.display.flush().ok();
+        cx.local.display.clear();
         // Periodic ever 1 seconds
         // TODO(elsuizo:2021-11-21): could modify this parameter from outside with a button for
         // example???
