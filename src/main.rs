@@ -28,6 +28,7 @@ mod app {
     use stm32f1xx_hal::{gpio, pac, prelude::*};
     use systick_monotonic::*;
 
+    use embedded_hal::digital::v2::OutputPin;
     use pac::I2C1;
     use sh1106::{prelude::*, Builder};
     use stm32f1xx_hal::{
@@ -54,13 +55,15 @@ mod app {
     // Resources shared between tasks
     #[shared]
     struct Shared {
-        counter: usize,
+        // TODO(elsuizo:2021-11-21): maybe this macro is nice but also i like that the locking
+        // resources explicity for gain verbosity
+        // #[lock_free]
+        led: Led,
     }
 
     #[local]
     struct Local {
         button0: Button<Button0Pin>,
-        led: Led,
         display: OledDisplay,
         logger: Logger,
     }
@@ -116,10 +119,10 @@ mod app {
             1000,
             1000,
         );
+
         //-------------------------------------------------------------------------
         //                        rtic initialization
         //-------------------------------------------------------------------------
-
         let mut display: GraphicsMode<_> = Builder::new().connect_i2c(i2c).into();
         display.init().unwrap();
         display.flush().unwrap();
@@ -132,47 +135,45 @@ mod app {
         blinky::spawn_after(1.secs()).unwrap();
 
         (
-            Shared { counter: 0 },
+            Shared { led },
             Local {
                 button0: Button::new(button0_pin),
-                led,
                 display,
                 logger,
             },
             init::Monotonics(mono),
         )
     }
+
     //-------------------------------------------------------------------------
     //                        tasks
     //-------------------------------------------------------------------------
-
-    #[idle(shared = [counter])]
-    fn idle(mut ctx: idle::Context) -> ! {
-        let idle::SharedResources { mut counter } = ctx.shared;
+    #[idle]
+    fn idle(ctx: idle::Context) -> ! {
         loop {
-            counter.lock(|c| {
-                *c += 1;
-            });
             continue;
         }
     }
 
-    #[task(local = [display, button0])]
+    // NOTE(elsuizo:2021-11-21): remember that the method set_low() needs the trait: `use embedded_hal::digital::v2::OutputPin;`
+    // to be used!!!
+    #[task(local = [display, button0], shared = [led])]
     fn react(cx: react::Context) {
-        use crate::ui::draw_text;
-        if let crate::buttons::Event::Pressed = cx.local.button0.poll() {
-            cx.local.display.flush().unwrap();
-            draw_text(cx.local.display, "button pressed!!!", 0, 24).unwrap();
+        let react::SharedResources { mut led } = cx.shared;
+        if let crate::buttons::PinState::PinUp = cx.local.button0.polling() {
+            led.lock(|l| l.set_low().ok());
         }
     }
 
-    #[task(local = [led, logger], shared = [counter])]
+    // NOTE(elsuizo:2021-11-21): when you have a shared Resources we need lock the variable for
+    // security reasons because we need to avoid data races!!!
+    #[task(local = [logger], shared = [led])]
     fn blinky(cx: blinky::Context) {
-        use core::fmt::Write;
-        use heapless::String;
+        let blinky::SharedResources { mut led } = cx.shared;
+        led.lock(|l| l.toggle().ok());
         // Periodic ever 1 seconds
-        cx.local.led.toggle().unwrap();
-
-        blinky::spawn_after(1.secs()).unwrap();
+        // TODO(elsuizo:2021-11-21): could modify this parameter from outside with a button for
+        // example???
+        blinky::spawn_after(1.secs()).ok();
     }
 }

@@ -1,5 +1,5 @@
-use core::convert::Infallible;
 /// Button primitives and implementations
+use core::convert::Infallible;
 use embedded_hal::digital::v2::InputPin;
 
 pub enum PinState {
