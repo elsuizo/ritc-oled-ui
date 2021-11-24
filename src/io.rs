@@ -40,7 +40,7 @@ impl Logger {
             if byte == 0x00 {
                 continue;
             }
-            block!(self.tx_pin.write(byte)).unwrap();
+            block!(self.tx_pin.write(byte)).ok();
         }
         Ok(())
     }

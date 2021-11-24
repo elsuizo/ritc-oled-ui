@@ -20,7 +20,7 @@ mod ui;
 use panic_semihosting as _;
 use rtic::app;
 
-#[app(device = stm32f1xx_hal::pac, dispatchers = [EXTI2])]
+#[app(device = stm32f1xx_hal::pac, dispatchers = [EXTI2, EXTI0])]
 mod app {
     use crate::buttons::Button;
     use crate::io::Logger;
@@ -43,7 +43,8 @@ mod app {
     type Led = gpio::gpioc::PC13<gpio::Output<gpio::PushPull>>;
     type Sda = gpio::gpiob::PB9<gpio::Alternate<gpio::OpenDrain>>;
     type Scl = gpio::gpiob::PB8<gpio::Alternate<gpio::OpenDrain>>;
-    type Button0Pin = gpio::gpioa::PA6<gpio::Input<gpio::PullUp>>;
+    type Button0Pin = gpio::gpioa::PA7<gpio::Input<gpio::PullUp>>;
+    type Button1Pin = gpio::gpioa::PA6<gpio::Input<gpio::PullUp>>;
     type OledDisplay = GraphicsMode<I2cInterface<BlockingI2c<I2C1, (Scl, Sda)>>>;
     // A monotonic timer to enable scheduling in RTIC
     #[monotonic(binds = SysTick, default = true)]
@@ -64,6 +65,7 @@ mod app {
     #[local]
     struct Local {
         button0: Button<Button0Pin>,
+        button1: Button<Button1Pin>,
         display: OledDisplay,
         logger: Logger,
     }
@@ -91,7 +93,7 @@ mod app {
         // USART1
         let tx = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
         let rx = gpiob.pb7;
-        let mut serial = Serial::usart1(
+        let serial = Serial::usart1(
             cx.device.USART1,
             (tx, rx),
             &mut afio.mapr,
@@ -100,7 +102,7 @@ mod app {
             &mut rcc.apb2,
         );
         let tx = serial.split().0;
-        let mut logger = Logger::new(tx);
+        let logger = Logger::new(tx);
         // oled display pins
         let scl = gpiob.pb8.into_alternate_open_drain(&mut gpiob.crh);
         let sda = gpiob.pb9.into_alternate_open_drain(&mut gpiob.crh);
@@ -129,15 +131,17 @@ mod app {
         let systick = cx.core.SYST;
         let mono = Systick::new(systick, 8_000_000);
 
-        let button0_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
-        // Spawn the task `blinky` 1 second after `init` finishes, this is enabled
-        // by the `#[monotonic(..)]` above
-        blinky::spawn_after(1.secs()).unwrap();
+        let button0_pin = gpioa.pa7.into_pull_up_input(&mut gpioa.crl);
+        let button1_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
+
+        // NOTE(elsuizo:2021-11-24): here we dont need a super fast spawn!!!
+        react::spawn_after(1.secs()).unwrap();
 
         (
             Shared { led },
             Local {
                 button0: Button::new(button0_pin),
+                button1: Button::new(button1_pin),
                 display,
                 logger,
             },
@@ -154,35 +158,62 @@ mod app {
             continue;
         }
     }
-
+    // NOTE(elsuizo:2021-11-24): the maximum period of this periodic task for a responsive button
+    // action is 13 ms
     // NOTE(elsuizo:2021-11-21): remember that the method set_low() needs the trait: `use embedded_hal::digital::v2::OutputPin;`
     // to be used!!!
-    #[task(local = [button0], shared = [led])]
+    #[task(local = [button0, button1])]
     fn react(cx: react::Context) {
-        let react::SharedResources { mut led } = cx.shared;
-        if let crate::buttons::PinState::PinUp = cx.local.button0.polling() {
-            led.lock(|l| l.toggle().ok());
+        use crate::buttons::PinState::*;
+        use crate::ui::Msg::*;
+
+        if let PinUp = cx.local.button0.polling() {
+            dispatch_msg::spawn(Button0).ok();
         }
+        if let PinUp = cx.local.button1.polling() {
+            dispatch_msg::spawn(Button1).ok();
+        }
+        react::spawn_after(13.millis()).unwrap();
+    }
+
+    #[task(local = [display, logger], shared = [led])]
+    fn dispatch_msg(cx: dispatch_msg::Context, msg: crate::ui::Msg) {
+        use crate::ui::Msg::*;
+        let dispatch_msg::SharedResources { mut led } = cx.shared;
+        match msg {
+            Button0 => {
+                // crate::ui::draw_text(cx.local.display, "Martin Noblia", 20, 20).ok();
+                // cx.local.display.flush().ok()
+                // led.lock(|l| l.toggle().ok());
+                cx.local.logger.log("button0 pressed!!!").ok();
+            }
+            Button1 => {
+                led.lock(|l| l.toggle().ok());
+                crate::ui::draw_text(cx.local.display, "piola", 20, 20).ok();
+                cx.local.display.flush().ok();
+            }
+        };
+        rtic::pend(stm32::Interrupt::EXTI1);
     }
 
     // NOTE(elsuizo:2021-11-21): when you have a shared Resources we need lock the variable for
     // security reasons because we need to avoid data races!!!
-    #[task(local = [display, x:i32 = 0, y:i32 = 0], shared = [led])]
-    fn blinky(cx: blinky::Context) {
-        let blinky::SharedResources { mut led } = cx.shared;
-        led.lock(|l| l.toggle().ok());
-        if *cx.local.y < crate::ui::DISPLAY_HEIGHT {
-            *cx.local.y += 5;
-        } else {
-            *cx.local.y = 0;
-        }
-        // *cx.local.x += 1;
-        crate::ui::draw_text(cx.local.display, "Martin Noblia", *cx.local.x, *cx.local.y).ok();
-        cx.local.display.flush().ok();
-        cx.local.display.clear();
-        // Periodic ever 1 seconds
-        // TODO(elsuizo:2021-11-21): could modify this parameter from outside with a button for
-        // example???
-        blinky::spawn_after(1.secs()).ok();
-    }
+    // #[task(local = [display, x:i32 = 0, y:i32 = 0], shared = [led])]
+    // fn blinky(cx: blinky::Context) {
+    //     let blinky::SharedResources { mut led } = cx.shared;
+    //     led.lock(|l| l.toggle().ok());
+    //     if *cx.local.y < crate::ui::DISPLAY_HEIGHT {
+    //         *cx.local.y += 5;
+    //     } else {
+    //         *cx.local.y = 0;
+    //     }
+    //     // *cx.local.x += 1;
+    //     crate::ui::draw_text(cx.local.display, "Martin Noblia", *cx.local.x, *cx.local.y).ok();
+    //     cx.local.display.flush().ok();
+    //     cx.local.display.clear();
+    //     // Periodic ever 1 seconds
+    //     // TODO(elsuizo:2021-11-21): could modify this parameter from outside with a button for
+    //     // example???
+    //     blinky::spawn_after(3.secs()).ok();
+    // }
 }

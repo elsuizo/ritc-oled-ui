@@ -37,3 +37,8 @@ where
 
     Ok(())
 }
+
+pub enum Msg {
+    Button0,
+    Button1,
+}

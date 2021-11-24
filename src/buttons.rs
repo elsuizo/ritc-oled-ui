@@ -29,6 +29,7 @@ impl<P: InputPin<Error = Infallible>> Button<P> {
         }
     }
 
+    /// poll the pin and generate a debounce algorithm:
     pub fn polling(&mut self) -> PinState {
         use self::ButtonState::*;
         let value = self.typ.is_high().unwrap();
@@ -39,11 +40,11 @@ impl<P: InputPin<Error = Infallible>> Button<P> {
             (Low(counter), false) => *counter = 0,
         }
         match self.state {
-            High(cnt) if cnt >= 10 => {
+            High(cnt) if cnt >= 30 => {
                 self.state = Low(0);
                 PinState::PinUp
             }
-            Low(cnt) if cnt >= 10 => {
+            Low(cnt) if cnt >= 30 => {
                 self.state = High(0);
                 PinState::PinDown
             }
