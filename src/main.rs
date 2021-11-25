@@ -43,8 +43,9 @@ mod app {
     type Led = gpio::gpioc::PC13<gpio::Output<gpio::PushPull>>;
     type Sda = gpio::gpiob::PB9<gpio::Alternate<gpio::OpenDrain>>;
     type Scl = gpio::gpiob::PB8<gpio::Alternate<gpio::OpenDrain>>;
-    type Button0Pin = gpio::gpioa::PA7<gpio::Input<gpio::PullUp>>;
+    type Button0Pin = gpio::gpioa::PA5<gpio::Input<gpio::PullUp>>;
     type Button1Pin = gpio::gpioa::PA6<gpio::Input<gpio::PullUp>>;
+    type Button2Pin = gpio::gpioa::PA7<gpio::Input<gpio::PullUp>>;
     type OledDisplay = GraphicsMode<I2cInterface<BlockingI2c<I2C1, (Scl, Sda)>>>;
     // A monotonic timer to enable scheduling in RTIC
     #[monotonic(binds = SysTick, default = true)]
@@ -66,6 +67,7 @@ mod app {
     struct Local {
         button0: Button<Button0Pin>,
         button1: Button<Button1Pin>,
+        button2: Button<Button2Pin>,
         display: OledDisplay,
         logger: Logger,
         menu_fsm: crate::ui::MenuFSM,
@@ -132,8 +134,10 @@ mod app {
         let systick = cx.core.SYST;
         let mono = Systick::new(systick, 8_000_000);
 
-        let button0_pin = gpioa.pa7.into_pull_up_input(&mut gpioa.crl);
+        // TODO(elsuizo:2021-11-25): better names for the buttons
+        let button0_pin = gpioa.pa5.into_pull_up_input(&mut gpioa.crl);
         let button1_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
+        let button2_pin = gpioa.pa7.into_pull_up_input(&mut gpioa.crl);
 
         // NOTE(elsuizo:2021-11-24): here we dont need a super fast spawn!!!
         react::spawn_after(1.secs()).unwrap();
@@ -143,6 +147,7 @@ mod app {
             Local {
                 button0: Button::new(button0_pin),
                 button1: Button::new(button1_pin),
+                button2: Button::new(button2_pin),
                 display,
                 logger,
                 menu_fsm: crate::ui::MenuFSM::init(crate::ui::MenuState::Row1),
@@ -164,7 +169,7 @@ mod app {
     // action is 13 ms
     // NOTE(elsuizo:2021-11-21): remember that the method set_low() needs the trait: `use embedded_hal::digital::v2::OutputPin;`
     // to be used!!!
-    #[task(local = [button0, button1])]
+    #[task(local = [button0, button1, button2])]
     fn react(cx: react::Context) {
         use crate::buttons::PinState::*;
         use crate::ui::Msg::*;
@@ -175,15 +180,18 @@ mod app {
         if let PinUp = cx.local.button1.polling() {
             dispatch_msg::spawn(Button1).ok();
         }
-        react::spawn_after(13.millis()).ok();
+        if let PinUp = cx.local.button2.polling() {
+            dispatch_msg::spawn(Button2).ok();
+        }
+        react::spawn_after(10.millis()).ok();
     }
 
     #[task(local = [display, logger, menu_fsm], shared = [led])]
     fn dispatch_msg(cx: dispatch_msg::Context, msg: crate::ui::Msg) {
         use crate::ui::Msg::*;
-        cx.local.display.clear();
-        cx.local.menu_fsm.advance(msg);
         let dispatch_msg::SharedResources { mut led } = cx.shared;
+        cx.local.display.clear();
+        cx.local.menu_fsm.next_state(msg);
         match msg {
             Button0 => {
                 led.lock(|l| l.toggle().ok());
@@ -197,28 +205,13 @@ mod app {
                 crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
                 cx.local.display.flush().ok();
             }
+            Button2 => {
+                led.lock(|l| l.toggle().ok());
+                cx.local.logger.log("button2 pressed!!!").ok();
+                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
+                cx.local.display.flush().ok();
+            }
         };
         // rtic::pend(stm32::Interrupt::EXTI1);
     }
-
-    // NOTE(elsuizo:2021-11-21): when you have a shared Resources we need lock the variable for
-    // security reasons because we need to avoid data races!!!
-    // #[task(local = [display, x:i32 = 0, y:i32 = 0], shared = [led])]
-    // fn blinky(cx: blinky::Context) {
-    //     let blinky::SharedResources { mut led } = cx.shared;
-    //     led.lock(|l| l.toggle().ok());
-    //     if *cx.local.y < crate::ui::DISPLAY_HEIGHT {
-    //         *cx.local.y += 5;
-    //     } else {
-    //         *cx.local.y = 0;
-    //     }
-    //     // *cx.local.x += 1;
-    //     crate::ui::draw_text(cx.local.display, "Martin Noblia", *cx.local.x, *cx.local.y).ok();
-    //     cx.local.display.flush().ok();
-    //     cx.local.display.clear();
-    //     // Periodic ever 1 seconds
-    //     // TODO(elsuizo:2021-11-21): could modify this parameter from outside with a button for
-    //     // example???
-    //     blinky::spawn_after(3.secs()).ok();
-    // }
 }

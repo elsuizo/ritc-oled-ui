@@ -84,6 +84,14 @@ where
 pub enum Msg {
     Button0, // Up
     Button1, // Down
+    Button2, // Enter button
+}
+
+#[derive(Copy, Clone)]
+pub enum Items {
+    Item1,
+    Item2,
+    Item3,
 }
 
 #[derive(Copy, Clone)]
@@ -103,7 +111,7 @@ impl MenuFSM {
         Self { state }
     }
 
-    pub fn advance(&mut self, msg: Msg) {
+    pub fn next_state(&mut self, msg: Msg) {
         use MenuState::*;
         use Msg::*;
 
@@ -114,6 +122,7 @@ impl MenuFSM {
             (Row2, Button1) => Row3,
             (Row3, Button0) => Row2,
             (Row3, Button1) => Row1,
+            (_, Button2) => Row1,
         }
     }
 }
