@@ -32,7 +32,7 @@ impl<P: InputPin<Error = Infallible>> Button<P> {
     /// poll the pin and generate a debounce algorithm:
     pub fn polling(&mut self) -> PinState {
         use self::ButtonState::*;
-        let value = self.typ.is_high().unwrap();
+        let value = self.typ.is_high().expect("could this fail???");
         match (&mut self.state, value) {
             (High(counter), true) => *counter = 0,
             (High(counter), false) => *counter += 1,

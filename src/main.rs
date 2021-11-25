@@ -68,6 +68,7 @@ mod app {
         button1: Button<Button1Pin>,
         display: OledDisplay,
         logger: Logger,
+        menu_fsm: crate::ui::MenuFSM,
     }
 
     //-------------------------------------------------------------------------
@@ -144,6 +145,7 @@ mod app {
                 button1: Button::new(button1_pin),
                 display,
                 logger,
+                menu_fsm: crate::ui::MenuFSM::init(crate::ui::MenuState::Row1),
             },
             init::Monotonics(mono),
         )
@@ -173,27 +175,30 @@ mod app {
         if let PinUp = cx.local.button1.polling() {
             dispatch_msg::spawn(Button1).ok();
         }
-        react::spawn_after(13.millis()).unwrap();
+        react::spawn_after(13.millis()).ok();
     }
 
-    #[task(local = [display, logger], shared = [led])]
+    #[task(local = [display, logger, menu_fsm], shared = [led])]
     fn dispatch_msg(cx: dispatch_msg::Context, msg: crate::ui::Msg) {
         use crate::ui::Msg::*;
+        cx.local.display.clear();
+        cx.local.menu_fsm.advance(msg);
         let dispatch_msg::SharedResources { mut led } = cx.shared;
         match msg {
             Button0 => {
-                // crate::ui::draw_text(cx.local.display, "Martin Noblia", 20, 20).ok();
-                // cx.local.display.flush().ok()
-                // led.lock(|l| l.toggle().ok());
+                led.lock(|l| l.toggle().ok());
                 cx.local.logger.log("button0 pressed!!!").ok();
+                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
+                cx.local.display.flush().ok();
             }
             Button1 => {
                 led.lock(|l| l.toggle().ok());
-                crate::ui::draw_text(cx.local.display, "piola", 20, 20).ok();
+                cx.local.logger.log("button1 pressed!!!").ok();
+                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
                 cx.local.display.flush().ok();
             }
         };
-        rtic::pend(stm32::Interrupt::EXTI1);
+        // rtic::pend(stm32::Interrupt::EXTI1);
     }
 
     // NOTE(elsuizo:2021-11-21): when you have a shared Resources we need lock the variable for
