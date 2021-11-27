@@ -21,7 +21,10 @@ pub struct Button<P> {
     state: ButtonState,
 }
 
+// TODO(elsuizo:2021-11-26): look what is the better COUNTER_THRESOLD parameter for this
 impl<P: InputPin<Error = Infallible>> Button<P> {
+    const COUNTER_THRESOLD: u8 = 15;
+
     pub fn new(typ: P) -> Self {
         Self {
             typ,
@@ -40,11 +43,11 @@ impl<P: InputPin<Error = Infallible>> Button<P> {
             (Low(counter), false) => *counter = 0,
         }
         match self.state {
-            High(cnt) if cnt >= 30 => {
+            High(counter) if counter >= Self::COUNTER_THRESOLD => {
                 self.state = Low(0);
                 PinState::PinUp
             }
-            Low(cnt) if cnt >= 30 => {
+            Low(counter) if counter >= Self::COUNTER_THRESOLD => {
                 self.state = High(0);
                 PinState::PinDown
             }

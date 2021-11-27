@@ -150,7 +150,7 @@ mod app {
                 button2: Button::new(button2_pin),
                 display,
                 logger,
-                menu_fsm: crate::ui::MenuFSM::init(crate::ui::MenuState::Row1),
+                menu_fsm: crate::ui::MenuFSM::init(crate::ui::MenuState::Row1(false)),
             },
             init::Monotonics(mono),
         )
@@ -175,13 +175,13 @@ mod app {
         use crate::ui::Msg::*;
 
         if let PinUp = cx.local.button0.polling() {
-            dispatch_msg::spawn(Button0).ok();
+            dispatch_msg::spawn(Up).ok();
         }
         if let PinUp = cx.local.button1.polling() {
-            dispatch_msg::spawn(Button1).ok();
+            dispatch_msg::spawn(Down).ok();
         }
         if let PinUp = cx.local.button2.polling() {
-            dispatch_msg::spawn(Button2).ok();
+            dispatch_msg::spawn(Enter).ok();
         }
         react::spawn_after(10.millis()).ok();
     }
@@ -193,21 +193,21 @@ mod app {
         cx.local.display.clear();
         cx.local.menu_fsm.next_state(msg);
         match msg {
-            Button0 => {
+            Up => {
                 led.lock(|l| l.toggle().ok());
-                cx.local.logger.log("button0 pressed!!!").ok();
+                cx.local.logger.log("button Up pressed!!!").ok();
                 crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
                 cx.local.display.flush().ok();
             }
-            Button1 => {
+            Down => {
                 led.lock(|l| l.toggle().ok());
-                cx.local.logger.log("button1 pressed!!!").ok();
+                cx.local.logger.log("button Down pressed!!!").ok();
                 crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
                 cx.local.display.flush().ok();
             }
-            Button2 => {
+            Enter => {
                 led.lock(|l| l.toggle().ok());
-                cx.local.logger.log("button2 pressed!!!").ok();
+                cx.local.logger.log("button Enter pressed!!!").ok();
                 crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
                 cx.local.display.flush().ok();
             }

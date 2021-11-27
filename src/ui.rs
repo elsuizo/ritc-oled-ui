@@ -1,5 +1,6 @@
 /// User interface primitives
 use embedded_graphics::{
+    image::{Image, ImageRawLE},
     mono_font::{ascii::FONT_9X15, MonoTextStyle, MonoTextStyleBuilder},
     pixelcolor::BinaryColor,
     prelude::*,
@@ -53,6 +54,7 @@ pub fn draw_menu<D>(target: &mut D, state: MenuState) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = BinaryColor>,
 {
+    let im: ImageRawLE<BinaryColor> = ImageRawLE::new(include_bytes!("../Images/rust.raw"), 64);
     // normal text
     let normal = MonoTextStyleBuilder::new()
         .font(&FONT_9X15)
@@ -64,17 +66,26 @@ where
         .text_color(BinaryColor::Off)
         .build();
 
-    let text = match state {
-        MenuState::Row1 => Text::new("--- Menu 1 ---", Point::new(0, 13), normal),
-        MenuState::Row2 => Text::new("--- Menu 2 ---", Point::new(0, 33), normal),
-        MenuState::Row3 => Text::new("--- Menu 3 ---", Point::new(0, 53), normal),
+    let result: TextOrImage = match state {
+        MenuState::Row1(true) => Text::new("--- Menu 1 ---", Point::new(0, 13), normal),
+        MenuState::Row1(false) => Text::new("--- Menu 1 ---", Point::new(0, 13), background),
+        MenuState::Row2(true) => Text::new("--- Menu 2 ---", Point::new(0, 33), normal),
+        MenuState::Row2(false) => Text::new("--- Menu 2 ---", Point::new(0, 33), background),
+        MenuState::Row3(true) => Text::new("--- Menu 3 ---", Point::new(0, 53), normal),
+        MenuState::Row3(false) => Text::new("--- Menu 3 ---", Point::new(0, 53), background),
+        MenuState::Image => Image::new(&im, Point::new(0, 13)),
     };
 
     // MonoTextStyle::new(&FONT_9X15, BinaryColor::On),
     // Draw the text after the background is drawn.
-    text.draw(target)?;
+    result.draw(target)?;
 
     Ok(())
+}
+
+enum TextOrImage {
+    Text,
+    Image,
 }
 
 //-------------------------------------------------------------------------
@@ -82,9 +93,9 @@ where
 //-------------------------------------------------------------------------
 #[derive(Copy, Clone)]
 pub enum Msg {
-    Button0, // Up
-    Button1, // Down
-    Button2, // Enter button
+    Up,    // Up button
+    Down,  // Down button
+    Enter, // Enter button
 }
 
 #[derive(Copy, Clone)]
@@ -94,11 +105,20 @@ pub enum Items {
     Item3,
 }
 
+type BackgroundFlag = bool;
+
 #[derive(Copy, Clone)]
 pub enum MenuState {
-    Row1,
-    Row2,
-    Row3,
+    Row1(BackgroundFlag),
+    Row2(BackgroundFlag),
+    Row3(BackgroundFlag),
+    Image,
+}
+
+impl MenuState {
+    fn is_row(&self) -> bool {
+        matches!(self, Self::Row1(_) | Self::Row2(_) | Self::Row3(_))
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -116,13 +136,14 @@ impl MenuFSM {
         use Msg::*;
 
         self.state = match (self.state, msg) {
-            (Row1, Button0) => Row3,
-            (Row1, Button1) => Row2,
-            (Row2, Button0) => Row1,
-            (Row2, Button1) => Row3,
-            (Row3, Button0) => Row2,
-            (Row3, Button1) => Row1,
-            (_, Button2) => Row1,
+            (Row1(_), Up) => Row3(false),
+            (Row1(_), Down) => Row2(false),
+            (Row2(_), Up) => Row1(false),
+            (Row2(_), Down) => Row3(false),
+            (Row3(_), Up) => Row2(false),
+            (Row3(_), Down) => Row1(false),
+            (_, Enter) => Image,
+            (Image, _) => Row1(false),
         }
     }
 }
