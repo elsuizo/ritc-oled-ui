@@ -50,6 +50,8 @@ where
     Ok(())
 }
 
+// TODO(elsuizo:2021-11-27): refactor this for a more consice implmentation
+/// This is the principal function that renders all the menu states
 pub fn draw_menu<D>(target: &mut D, state: MenuState) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = BinaryColor>,
@@ -66,26 +68,37 @@ where
         .text_color(BinaryColor::Off)
         .build();
 
-    let result: TextOrImage = match state {
-        MenuState::Row1(true) => Text::new("--- Menu 1 ---", Point::new(0, 13), normal),
-        MenuState::Row1(false) => Text::new("--- Menu 1 ---", Point::new(0, 13), background),
-        MenuState::Row2(true) => Text::new("--- Menu 2 ---", Point::new(0, 33), normal),
-        MenuState::Row2(false) => Text::new("--- Menu 2 ---", Point::new(0, 33), background),
-        MenuState::Row3(true) => Text::new("--- Menu 3 ---", Point::new(0, 53), normal),
-        MenuState::Row3(false) => Text::new("--- Menu 3 ---", Point::new(0, 53), background),
-        MenuState::Image => Image::new(&im, Point::new(0, 13)),
-    };
-
-    // MonoTextStyle::new(&FONT_9X15, BinaryColor::On),
-    // Draw the text after the background is drawn.
-    result.draw(target)?;
-
+    match state {
+        MenuState::Row1(true) => {
+            let result = Text::new("--- Menu 1 ---", Point::new(0, 13), normal);
+            result.draw(target)?;
+        }
+        MenuState::Row1(false) => {
+            let result = Text::new("--- Menu 1 ---", Point::new(0, 13), background);
+            result.draw(target)?;
+        }
+        MenuState::Row2(true) => {
+            let result = Text::new("--- Menu 2 ---", Point::new(0, 33), normal);
+            result.draw(target)?;
+        }
+        MenuState::Row2(false) => {
+            let result = Text::new("--- Menu 2 ---", Point::new(0, 33), background);
+            result.draw(target)?;
+        }
+        MenuState::Row3(true) => {
+            let result = Text::new("--- Menu 3 ---", Point::new(0, 53), normal);
+            result.draw(target)?;
+        }
+        MenuState::Row3(false) => {
+            let result = Text::new("--- Menu 3 ---", Point::new(0, 53), background);
+            result.draw(target)?;
+        }
+        MenuState::Image => {
+            let result = Image::new(&im, Point::new(32, 0));
+            result.draw(target)?;
+        }
+    }
     Ok(())
-}
-
-enum TextOrImage {
-    Text,
-    Image,
 }
 
 //-------------------------------------------------------------------------
