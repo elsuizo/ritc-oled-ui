@@ -20,7 +20,7 @@ mod ui;
 use panic_semihosting as _;
 use rtic::app;
 
-#[app(device = stm32f1xx_hal::pac, dispatchers = [EXTI2, EXTI0])]
+#[app(device = stm32f1xx_hal::pac, dispatchers = [EXTI0])]
 mod app {
     use crate::buttons::Button;
     use crate::io::Logger;
@@ -28,14 +28,11 @@ mod app {
     use stm32f1xx_hal::{gpio, pac, prelude::*};
     use systick_monotonic::*;
 
-    use embedded_hal::digital::v2::OutputPin;
     use pac::I2C1;
     use sh1106::{prelude::*, Builder};
     use stm32f1xx_hal::{
         i2c::{BlockingI2c, DutyCycle, Mode},
-        prelude::*,
-        serial::{self, Config, Serial},
-        stm32,
+        serial::{Config, Serial},
     };
     //-------------------------------------------------------------------------
     //                        type alias
@@ -43,9 +40,9 @@ mod app {
     type Led = gpio::gpioc::PC13<gpio::Output<gpio::PushPull>>;
     type Sda = gpio::gpiob::PB9<gpio::Alternate<gpio::OpenDrain>>;
     type Scl = gpio::gpiob::PB8<gpio::Alternate<gpio::OpenDrain>>;
-    type Button0Pin = gpio::gpioa::PA5<gpio::Input<gpio::PullUp>>;
-    type Button1Pin = gpio::gpioa::PA6<gpio::Input<gpio::PullUp>>;
-    type Button2Pin = gpio::gpioa::PA7<gpio::Input<gpio::PullUp>>;
+    type ButtonUpPin = gpio::gpioa::PA5<gpio::Input<gpio::PullUp>>;
+    type ButtonDownPin = gpio::gpioa::PA6<gpio::Input<gpio::PullUp>>;
+    type ButtonEnterPin = gpio::gpioa::PA7<gpio::Input<gpio::PullUp>>;
     type OledDisplay = GraphicsMode<I2cInterface<BlockingI2c<I2C1, (Scl, Sda)>>>;
     // A monotonic timer to enable scheduling in RTIC
     #[monotonic(binds = SysTick, default = true)]
@@ -57,17 +54,14 @@ mod app {
     // Resources shared between tasks
     #[shared]
     struct Shared {
-        // TODO(elsuizo:2021-11-21): maybe this macro is nice but also i like that the locking
-        // resources explicity for gain verbosity
-        // #[lock_free]
         led: Led,
     }
 
     #[local]
     struct Local {
-        button0: Button<Button0Pin>,
-        button1: Button<Button1Pin>,
-        button2: Button<Button2Pin>,
+        button_up: Button<ButtonUpPin>,
+        button_down: Button<ButtonDownPin>,
+        button_enter: Button<ButtonEnterPin>,
         display: OledDisplay,
         logger: Logger,
         menu_fsm: crate::ui::MenuFSM,
@@ -134,10 +128,9 @@ mod app {
         let systick = cx.core.SYST;
         let mono = Systick::new(systick, 8_000_000);
 
-        // TODO(elsuizo:2021-11-25): better names for the buttons
-        let button0_pin = gpioa.pa5.into_pull_up_input(&mut gpioa.crl);
-        let button1_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
-        let button2_pin = gpioa.pa7.into_pull_up_input(&mut gpioa.crl);
+        let button_up_pin = gpioa.pa5.into_pull_up_input(&mut gpioa.crl);
+        let button_down_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
+        let button_enter_pin = gpioa.pa7.into_pull_up_input(&mut gpioa.crl);
 
         // NOTE(elsuizo:2021-11-24): here we dont need a super fast spawn!!!
         react::spawn_after(1.secs()).unwrap();
@@ -145,9 +138,9 @@ mod app {
         (
             Shared { led },
             Local {
-                button0: Button::new(button0_pin),
-                button1: Button::new(button1_pin),
-                button2: Button::new(button2_pin),
+                button_up: Button::new(button_up_pin),
+                button_down: Button::new(button_down_pin),
+                button_enter: Button::new(button_enter_pin),
                 display,
                 logger,
                 menu_fsm: crate::ui::MenuFSM::init(crate::ui::MenuState::Row1(false)),
@@ -169,18 +162,18 @@ mod app {
     // action is 13 ms
     // NOTE(elsuizo:2021-11-21): remember that the method set_low() needs the trait: `use embedded_hal::digital::v2::OutputPin;`
     // to be used!!!
-    #[task(local = [button0, button1, button2])]
+    #[task(local = [button_up, button_down, button_enter])]
     fn react(cx: react::Context) {
         use crate::buttons::PinState::*;
         use crate::ui::Msg::*;
 
-        if let PinUp = cx.local.button0.polling() {
+        if let PinUp = cx.local.button_up.poll() {
             dispatch_msg::spawn(Up).ok();
         }
-        if let PinUp = cx.local.button1.polling() {
+        if let PinUp = cx.local.button_down.poll() {
             dispatch_msg::spawn(Down).ok();
         }
-        if let PinUp = cx.local.button2.polling() {
+        if let PinUp = cx.local.button_enter.poll() {
             dispatch_msg::spawn(Enter).ok();
         }
         react::spawn_after(10.millis()).ok();
