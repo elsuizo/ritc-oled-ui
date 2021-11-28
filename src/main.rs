@@ -3,11 +3,11 @@
 // @author Martin Noblia
 // TODOs
 // - [X] Periodic task blinky compile and working
-// - [ ] include the oled display
-// - [ ] do the menu with buttons
-//  - [ ] read the buttons
-//  - [ ] generate a state machine with the menu states
-// - [ ] enable UART debug
+// - [X] include the oled display
+// - [X] do the menu with buttons
+// - [X] enable UART debug
+//  - [X] read the buttons
+//  - [X] generate a state machine with the menu states
 //----------------------------------------------------------------------------
 #![deny(unsafe_code)]
 // #![deny(warnings)]
@@ -212,6 +212,5 @@ mod app {
                 cx.local.display.flush().ok();
             }
         };
-        // rtic::pend(stm32::Interrupt::EXTI1);
     }
 }
