@@ -56,7 +56,8 @@ pub fn draw_menu<D>(target: &mut D, state: MenuState) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = BinaryColor>,
 {
-    let im: ImageRawLE<BinaryColor> = ImageRawLE::new(include_bytes!("../Images/rust.raw"), 64);
+    let im: ImageRawLE<BinaryColor> =
+        ImageRawLE::new(include_bytes!("../Images/very_logo.raw"), 64);
     // normal text
     let normal = MonoTextStyleBuilder::new()
         .font(&FONT_9X15)
