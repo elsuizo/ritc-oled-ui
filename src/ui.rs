@@ -43,14 +43,13 @@ where
         true => Text::new(message, Point::new(x, y), normal),
         false => Text::new(message, Point::new(x, y), background),
     };
-    // MonoTextStyle::new(&FONT_9X15, BinaryColor::On),
-    // Draw the text after the background is drawn.
+
     text.draw(target)?;
 
     Ok(())
 }
 
-// TODO(elsuizo:2021-11-27): refactor this for a more consice implmentation
+// TODO(elsuizo:2021-11-27): refactor this for a more concise implementation
 /// This is the principal function that renders all the menu states
 pub fn draw_menu<D>(target: &mut D, state: MenuState) -> Result<(), D::Error>
 where
@@ -69,34 +68,31 @@ where
         .text_color(BinaryColor::Off)
         .build();
 
+    // TODO(elsuizo:2021-11-28): could be better some sort of calculation for the place of the
+    // menus positions ...
     match state {
         MenuState::Row1(true) => {
-            let result = Text::new("--- Menu 1 ---", Point::new(0, 13), normal);
-            result.draw(target)?;
-        }
-        MenuState::Row1(false) => {
-            let result = Text::new("--- Menu 1 ---", Point::new(0, 13), background);
-            result.draw(target)?;
+            Text::new("--- Menu 1 ---", Point::new(0, 13), background).draw(target)?;
+            Text::new("--- Menu 2 ---", Point::new(0, 33), normal).draw(target)?;
+            Text::new("--- Menu 3 ---", Point::new(0, 53), normal).draw(target)?;
         }
         MenuState::Row2(true) => {
-            let result = Text::new("--- Menu 2 ---", Point::new(0, 33), normal);
-            result.draw(target)?;
-        }
-        MenuState::Row2(false) => {
-            let result = Text::new("--- Menu 2 ---", Point::new(0, 33), background);
-            result.draw(target)?;
+            Text::new("--- Menu 1 ---", Point::new(0, 13), normal).draw(target)?;
+            Text::new("--- Menu 2 ---", Point::new(0, 33), background).draw(target)?;
+            Text::new("--- Menu 3 ---", Point::new(0, 53), normal).draw(target)?;
         }
         MenuState::Row3(true) => {
-            let result = Text::new("--- Menu 3 ---", Point::new(0, 53), normal);
-            result.draw(target)?;
+            Text::new("--- Menu 1 ---", Point::new(0, 13), normal).draw(target)?;
+            Text::new("--- Menu 2 ---", Point::new(0, 33), normal).draw(target)?;
+            Text::new("--- Menu 3 ---", Point::new(0, 53), background).draw(target)?;
         }
-        MenuState::Row3(false) => {
-            let result = Text::new("--- Menu 3 ---", Point::new(0, 53), background);
-            result.draw(target)?;
+        MenuState::Row1(false) | MenuState::Row2(false) | MenuState::Row3(false) => {
+            Text::new("--- Menu 1 ---", Point::new(0, 13), normal).draw(target)?;
+            Text::new("--- Menu 2 ---", Point::new(0, 33), normal).draw(target)?;
+            Text::new("--- Menu 3 ---", Point::new(0, 53), normal).draw(target)?;
         }
         MenuState::Image => {
-            let result = Image::new(&im, Point::new(32, 0));
-            result.draw(target)?;
+            Image::new(&im, Point::new(32, 0)).draw(target)?;
         }
     }
     Ok(())
@@ -112,13 +108,6 @@ pub enum Msg {
     Enter, // Enter button
 }
 
-#[derive(Copy, Clone)]
-pub enum Items {
-    Item1,
-    Item2,
-    Item3,
-}
-
 type BackgroundFlag = bool;
 
 #[derive(Copy, Clone)]
@@ -130,6 +119,7 @@ pub enum MenuState {
 }
 
 impl MenuState {
+    /// check if the state is a Rown
     fn is_row(&self) -> bool {
         matches!(self, Self::Row1(_) | Self::Row2(_) | Self::Row3(_))
     }
@@ -150,12 +140,14 @@ impl MenuFSM {
         use Msg::*;
 
         self.state = match (self.state, msg) {
-            (Row1(_), Up) => Row3(false),
-            (Row1(_), Down) => Row2(false),
-            (Row2(_), Up) => Row1(false),
-            (Row2(_), Down) => Row3(false),
-            (Row3(_), Up) => Row2(false),
-            (Row3(_), Down) => Row1(false),
+            (Row1(false), Up) => Row1(true),
+            (Row1(false), Down) => Row1(true),
+            (Row1(_), Up) => Row3(true),
+            (Row1(_), Down) => Row2(true),
+            (Row2(_), Up) => Row1(true),
+            (Row2(_), Down) => Row3(true),
+            (Row3(_), Up) => Row2(true),
+            (Row3(_), Down) => Row1(true),
             (_, Enter) => Image,
             (Image, _) => Row1(false),
         }
