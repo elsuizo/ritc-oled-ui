@@ -1,62 +1,25 @@
 /// User interface primitives
 use embedded_graphics::{
     image::{Image, ImageRawLE},
-    mono_font::{ascii::FONT_9X15, MonoTextStyle, MonoTextStyleBuilder},
+    mono_font::{ascii::FONT_9X15, MonoTextStyleBuilder},
     pixelcolor::BinaryColor,
     prelude::*,
-    primitives::{Circle, Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle},
     text::Text,
 };
 
+// TODO(elsuizo:2021-11-28): use this constants for a better text positions
 pub const DISPLAY_WIDTH: i32 = 128;
 pub const DISPLAY_HEIGHT: i32 = DISPLAY_WIDTH / 2;
 pub const ROWS_HEIGT: i32 = DISPLAY_WIDTH / 3;
-const X_PAD: i32 = 1;
-const Y_PAD: i32 = 2;
 const CHAR_HEIGHT: i32 = 14;
 const CHAR_WIDTH: i32 = 6;
-// const BAR_WIDTH: u32 = (DISP_WIDTH - X_PAD * 2) as u32;
 
-pub fn draw_text<D>(
-    target: &mut D,
-    message: &str,
-    x: i32,
-    y: i32,
-    selected: bool,
-) -> Result<(), D::Error>
-where
-    D: DrawTarget<Color = BinaryColor>,
-{
-    // normal text
-    let normal = MonoTextStyleBuilder::new()
-        .font(&FONT_9X15)
-        .text_color(BinaryColor::On)
-        .build();
-
-    // text with background
-    let background = MonoTextStyleBuilder::from(&normal)
-        .background_color(BinaryColor::On)
-        .text_color(BinaryColor::Off)
-        .build();
-
-    let text = match selected {
-        true => Text::new(message, Point::new(x, y), normal),
-        false => Text::new(message, Point::new(x, y), background),
-    };
-
-    text.draw(target)?;
-
-    Ok(())
-}
-
-// TODO(elsuizo:2021-11-27): refactor this for a more concise implementation
 /// This is the principal function that renders all the menu states
 pub fn draw_menu<D>(target: &mut D, state: MenuState) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = BinaryColor>,
 {
-    let im: ImageRawLE<BinaryColor> =
-        ImageRawLE::new(include_bytes!("../Images/very_logo.raw"), 64);
+    let logo_image = ImageRawLE::new(include_bytes!("../Images/very_logo.raw"), 64);
     // normal text
     let normal = MonoTextStyleBuilder::new()
         .font(&FONT_9X15)
@@ -69,7 +32,7 @@ where
         .build();
 
     // TODO(elsuizo:2021-11-28): could be better some sort of calculation for the place of the
-    // menus positions ...
+    // menus positions and not hardcoded values...
     match state {
         MenuState::Row1(true) => {
             Text::new("--- Menu 1 ---", Point::new(0, 13), background).draw(target)?;
@@ -92,7 +55,7 @@ where
             Text::new("--- Menu 3 ---", Point::new(0, 53), normal).draw(target)?;
         }
         MenuState::Image => {
-            Image::new(&im, Point::new(32, 0)).draw(target)?;
+            Image::new(&logo_image, Point::new(32, 0)).draw(target)?;
         }
     }
     Ok(())

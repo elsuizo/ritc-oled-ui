@@ -129,8 +129,8 @@ mod app {
         //                        rtic initialization
         //-------------------------------------------------------------------------
         let mut display: GraphicsMode<_> = Builder::new().connect_i2c(i2c).into();
-        display.init().unwrap();
-        display.flush().unwrap();
+        display.init().ok();
+        display.flush().ok();
         let systick = cx.core.SYST;
         let mono = Systick::new(systick, 8_000_000);
 
