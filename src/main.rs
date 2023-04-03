@@ -17,25 +17,25 @@
 mod buttons;
 mod io;
 mod ui;
+use crate::buttons::Button;
+use crate::io::Logger;
+// use crate::Systick;
 use panic_rtt_target as _;
 use rtic::app;
-// #[app(device = stm32f1xx_hal::pac, dispatchers = [EXTI0])]
-// #[app(device = stm32f1xx_hal::pac, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
-#[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [EXTI0])]
-mod app {
-    use crate::buttons::Button;
-    use crate::io::Logger;
-    use crate::Systick;
-    use stm32f1xx_hal::gpio::PinState;
-    use stm32f1xx_hal::{gpio, pac, prelude::*};
+use stm32f1xx_hal::gpio::PinState;
+use stm32f1xx_hal::{gpio, pac, prelude::*};
 
-    use pac::I2C1;
-    use sh1106::{prelude::*, Builder};
-    use stm32f1xx_hal::{
-        i2c::{BlockingI2c, DutyCycle, Mode},
-        serial::{Config, Serial},
-    };
-    use systick_monotonic::{fugit::Duration, Systick};
+use pac::I2C1;
+use sh1106::{prelude::*, Builder};
+use stm32f1xx_hal::{
+    i2c::{BlockingI2c, DutyCycle, Mode},
+    serial::{Config, Serial},
+};
+use systick_monotonic::{fugit::Duration, Systick};
+
+#[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [SPI1])]
+mod app {
+    use super::*;
     //-------------------------------------------------------------------------
     //                        type alias
     //-------------------------------------------------------------------------
@@ -80,7 +80,7 @@ mod app {
         //-------------------------------------------------------------------------
         //                        hardware initialization
         //-------------------------------------------------------------------------
-        let mut rcc = cx.device.RCC.constrain();
+        let rcc = cx.device.RCC.constrain();
         let mut flash = cx.device.FLASH.constrain();
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
         let mut afio = cx.device.AFIO.constrain();
@@ -95,13 +95,12 @@ mod app {
         // USART1
         let tx = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
         let rx = gpiob.pb7;
-        let serial = Serial::usart1(
+        let serial = Serial::new(
             cx.device.USART1,
             (tx, rx),
             &mut afio.mapr,
             Config::default().baudrate(9600.bps()),
-            clocks,
-            &mut rcc.apb2,
+            &clocks,
         );
         let tx = serial.split().0;
         let logger = Logger::new(tx);
@@ -113,11 +112,10 @@ mod app {
             (scl, sda),
             &mut afio.mapr,
             Mode::Fast {
-                frequency: 100.khz().into(),
+                frequency: 100.kHz(),
                 duty_cycle: DutyCycle::Ratio2to1,
             },
             clocks,
-            &mut rcc.apb1,
             1000,
             10,
             1000,
@@ -197,19 +195,19 @@ mod app {
                 led.lock(|l| l.toggle());
                 cx.local.logger.log("button Up pressed!!!").ok();
                 crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
-                cx.local.display.flush();
+                cx.local.display.flush().unwrap();
             }
             Down => {
                 led.lock(|l| l.toggle());
                 cx.local.logger.log("button Down pressed!!!").ok();
                 crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
-                cx.local.display.flush();
+                cx.local.display.flush().unwrap();
             }
             Enter => {
                 led.lock(|l| l.toggle());
                 cx.local.logger.log("button Enter pressed!!!").ok();
                 crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
-                cx.local.display.flush();
+                cx.local.display.flush().unwrap();
             }
         };
     }

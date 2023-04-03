@@ -1,6 +1,6 @@
-use embedded_hal as hal;
+// use embedded_hal as hal;
 
-use hal::serial::Write;
+// use hal::serial::Write;
 use nb::block;
 use stm32f1xx_hal::pac::USART1;
 

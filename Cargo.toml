@@ -6,10 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nb = "1.0.0"
+# nb = "1.0.0"
+nb = "1.1.0"
 cortex-m-rtic = "1.1.4"
 systick-monotonic = "1.0.0"
-cortex-m = "0.7.7"
+# cortex-m = "0.7.7"
 embedded-hal = "0.2.6"
 sh1106 = "0.4.0"
 embedded-graphics = "0.7.1"
@@ -22,13 +23,19 @@ rtt-target = { version = "0.3.1", features = ["cortex-m"] }
 version = "0.10.0"
 features = ["rt", "stm32f103", "medium"]
 
+[[bin]]
+name = "rtic-oled-ui"
+test = false
+bench = false
+
 [profile.dev]
 opt-level = 1
-lto = true
-incremental = false
+codegen-units = 16
+debug = true
+lto = false
 
 [profile.release]
-lto = true
-incremental = false
-opt-level = "z"
-debug = true
+opt-level = "s"   # optimize for size
+codegen-units = 1 # better optimizations
+debug = true      # symbols are nice and they don't increase the size on Flash
+lto = true        # better optimizations
