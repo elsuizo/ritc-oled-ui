@@ -15,27 +15,22 @@ embedded-hal = "0.2.6"
 sh1106 = "0.4.0"
 embedded-graphics = "0.7.1"
 heapless = "0.7.16"
-panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
-rtt-target = { version = "0.3.1", features = ["cortex-m"] }
+panic-semihosting = "0.6.0"
+# panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
+# rtt-target = { version = "0.3.1", features = ["cortex-m"] }
 # portable = { path = "portable" }
 
 [dependencies.stm32f1xx-hal]
 version = "0.10.0"
 features = ["rt", "stm32f103", "medium"]
 
-[[bin]]
-name = "rtic-oled-ui"
-test = false
-bench = false
-
 [profile.dev]
 opt-level = 1
-codegen-units = 16
-debug = true
-lto = false
+lto = true
+incremental = false
 
 [profile.release]
-opt-level = "s"   # optimize for size
-codegen-units = 1 # better optimizations
-debug = true      # symbols are nice and they don't increase the size on Flash
-lto = true        # better optimizations
+lto = true
+incremental = false
+opt-level = "z"
+debug = true

@@ -20,7 +20,8 @@ mod ui;
 use crate::buttons::Button;
 use crate::io::Logger;
 // use crate::Systick;
-use panic_rtt_target as _;
+// use panic_rtt_target as _;
+use panic_semihosting as _;
 use rtic::app;
 use stm32f1xx_hal::gpio::PinState;
 use stm32f1xx_hal::{gpio, pac, prelude::*};
@@ -33,7 +34,7 @@ use stm32f1xx_hal::{
 };
 use systick_monotonic::{fugit::Duration, Systick};
 
-#[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [SPI1])]
+#[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [SPI2])]
 mod app {
     use super::*;
     //-------------------------------------------------------------------------
