@@ -8,11 +8,11 @@ use embedded_graphics::{
 };
 
 // TODO(elsuizo:2021-11-28): use this constants for a better text positions
-pub const DISPLAY_WIDTH: i32 = 128;
-pub const DISPLAY_HEIGHT: i32 = DISPLAY_WIDTH / 2;
-pub const ROWS_HEIGT: i32 = DISPLAY_WIDTH / 3;
-const CHAR_HEIGHT: i32 = 14;
-const CHAR_WIDTH: i32 = 6;
+// pub const DISPLAY_WIDTH: i32 = 128;
+// pub const DISPLAY_HEIGHT: i32 = DISPLAY_WIDTH / 2;
+// pub const ROWS_HEIGT: i32 = DISPLAY_WIDTH / 3;
+// const CHAR_HEIGHT: i32 = 14;
+// const CHAR_WIDTH: i32 = 6;
 
 /// This is the principal function that renders all the menu states
 pub fn draw_menu<D>(target: &mut D, state: MenuState) -> Result<(), D::Error>

@@ -19,8 +19,6 @@ mod io;
 mod ui;
 use crate::buttons::Button;
 use crate::io::Logger;
-// use crate::Systick;
-// use panic_rtt_target as _;
 use panic_semihosting as _;
 use rtic::app;
 use stm32f1xx_hal::gpio::PinState;
@@ -34,7 +32,7 @@ use stm32f1xx_hal::{
 };
 use systick_monotonic::{fugit::Duration, Systick};
 
-#[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [SPI2])]
+#[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [SPI1])]
 mod app {
     use super::*;
     //-------------------------------------------------------------------------
@@ -83,7 +81,13 @@ mod app {
         //-------------------------------------------------------------------------
         let rcc = cx.device.RCC.constrain();
         let mut flash = cx.device.FLASH.constrain();
-        let clocks = rcc.cfgr.freeze(&mut flash.acr);
+        // let clocks = rcc.cfgr.freeze(&mut flash.acr);
+        let clocks = rcc
+            .cfgr
+            .use_hse(8.MHz())
+            .sysclk(36.MHz())
+            .pclk1(36.MHz())
+            .freeze(&mut flash.acr);
         let mut afio = cx.device.AFIO.constrain();
 
         let mut gpioa = cx.device.GPIOA.split();
@@ -130,15 +134,14 @@ mod app {
         display.init().ok();
         display.flush().ok();
         let systick = cx.core.SYST;
+        // let mono = Systick::new(systick, 36_000_000);
         let mono = Systick::new(systick, 8_000_000);
 
         let button_up_pin = gpioa.pa5.into_pull_up_input(&mut gpioa.crl);
         let button_down_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
         let button_enter_pin = gpioa.pa7.into_pull_up_input(&mut gpioa.crl);
 
-        // NOTE(elsuizo:2021-11-24): here we dont need a super fast spawn!!!
-        // react::spawn_after(1.secs()).unwrap();
-
+        // NOTE(elsuizo:2021-11-24): here we dont need a super fast spawn(for the inititlization...)!!!
         react::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
 
         (
@@ -168,7 +171,7 @@ mod app {
     // action is 13 ms
     // NOTE(elsuizo:2021-11-21): remember that the method set_low() needs the trait: `use embedded_hal::digital::v2::OutputPin;`
     // to be used!!!
-    #[task(local = [button_up, button_down, button_enter])]
+    #[task(local = [button_up, button_down, button_enter], shared = [led])]
     fn react(cx: react::Context) {
         use crate::buttons::PinState::*;
         use crate::ui::Msg::*;
@@ -182,7 +185,7 @@ mod app {
         if let PinUp = cx.local.button_enter.poll() {
             dispatch_msg::spawn(Enter).ok();
         }
-        react::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        react::spawn_after(Duration::<u64, 1, 1000>::from_ticks(30)).unwrap();
     }
 
     #[task(local = [display, logger, menu_fsm], shared = [led])]
