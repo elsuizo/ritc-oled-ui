@@ -15,19 +15,26 @@
 #![no_std]
 
 mod buttons;
+mod datetime;
 mod io;
 mod ui;
+
 use crate::buttons::Button;
 use crate::io::Logger;
+use datetime::DateTime;
 use panic_semihosting as _;
 use rtic::app;
 use stm32f1xx_hal::gpio::PinState;
 use stm32f1xx_hal::{gpio, pac, prelude::*};
 
+use core::fmt::Write;
+
+use heapless::String;
 use pac::I2C1;
 use sh1106::{prelude::*, Builder};
 use stm32f1xx_hal::{
     i2c::{BlockingI2c, DutyCycle, Mode},
+    rtc::Rtc,
     serial::{Config, Serial},
 };
 use systick_monotonic::{fugit::Duration, Systick};
@@ -45,10 +52,6 @@ mod app {
     type ButtonDownPin = gpio::gpioa::PA6<gpio::Input<gpio::PullUp>>;
     type ButtonEnterPin = gpio::gpioa::PA7<gpio::Input<gpio::PullUp>>;
     type OledDisplay = GraphicsMode<I2cInterface<BlockingI2c<I2C1, (Scl, Sda)>>>;
-    // NOTE(elsuizo: 2023-03-31): old monotonic timer
-    // A monotonic timer to enable scheduling in RTIC
-    // #[monotonic(binds = SysTick, default = true)]
-    // type MyMono = Systick<72>;
 
     #[monotonic(binds = SysTick, default = true)]
     type MonoTimer = Systick<1000>;
@@ -66,6 +69,7 @@ mod app {
         button_up: Button<ButtonUpPin>,
         button_down: Button<ButtonDownPin>,
         button_enter: Button<ButtonEnterPin>,
+        rtc: Rtc,
         display: OledDisplay,
         logger: Logger,
         menu_fsm: crate::ui::MenuFSM,
@@ -80,6 +84,7 @@ mod app {
         //                        hardware initialization
         //-------------------------------------------------------------------------
         let rcc = cx.device.RCC.constrain();
+        let mut pwr = cx.device.PWR;
         let mut flash = cx.device.FLASH.constrain();
         // let clocks = rcc.cfgr.freeze(&mut flash.acr);
         let clocks = rcc
@@ -88,7 +93,15 @@ mod app {
             .sysclk(36.MHz())
             .pclk1(36.MHz())
             .freeze(&mut flash.acr);
+
+        // let clocks = rcc
+        //     .cfgr
+        //     .use_hse(8.MHz())
+        //     .sysclk(72.MHz())
+        //     .pclk1(36.MHz())
+        //     .freeze(&mut flash.acr);
         let mut afio = cx.device.AFIO.constrain();
+        let mut backup_domain = rcc.bkp.constrain(cx.device.BKP, &mut pwr);
 
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
@@ -140,6 +153,21 @@ mod app {
         let button_up_pin = gpioa.pa5.into_pull_up_input(&mut gpioa.crl);
         let button_down_pin = gpioa.pa6.into_pull_up_input(&mut gpioa.crl);
         let button_enter_pin = gpioa.pa7.into_pull_up_input(&mut gpioa.crl);
+        let mut rtc = Rtc::new(cx.device.RTC, &mut backup_domain);
+        let today = DateTime {
+            year: 2021,
+            month: 4,
+            day: 17,
+            hour: 17,
+            min: 24,
+            sec: 00,
+            day_of_week: datetime::DayOfWeek::Saturday,
+        };
+        if let Some(epoch) = today.to_epoch() {
+            rtc.set_time(epoch);
+        }
+
+        rtc.listen_seconds();
 
         // NOTE(elsuizo:2021-11-24): here we dont need a super fast spawn(for the inititlization...)!!!
         react::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
@@ -150,6 +178,7 @@ mod app {
                 button_up: Button::new(button_up_pin),
                 button_down: Button::new(button_down_pin),
                 button_enter: Button::new(button_enter_pin),
+                rtc,
                 display,
                 logger,
                 menu_fsm: crate::ui::MenuFSM::init(crate::ui::MenuState::Row1(false)),
@@ -188,7 +217,7 @@ mod app {
         react::spawn_after(Duration::<u64, 1, 1000>::from_ticks(30)).unwrap();
     }
 
-    #[task(local = [display, logger, menu_fsm], shared = [led])]
+    #[task(local = [display, logger, menu_fsm, rtc], shared = [led])]
     fn dispatch_msg(cx: dispatch_msg::Context, msg: crate::ui::Msg) {
         use crate::ui::Msg::*;
         let dispatch_msg::SharedResources { mut led } = cx.shared;
@@ -198,19 +227,22 @@ mod app {
             Up => {
                 led.lock(|l| l.toggle());
                 cx.local.logger.log("button Up pressed!!!").ok();
-                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
+                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state, None).ok();
                 cx.local.display.flush().unwrap();
             }
             Down => {
                 led.lock(|l| l.toggle());
                 cx.local.logger.log("button Down pressed!!!").ok();
-                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
+                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state, None).ok();
                 cx.local.display.flush().unwrap();
             }
             Enter => {
                 led.lock(|l| l.toggle());
                 cx.local.logger.log("button Enter pressed!!!").ok();
-                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state).ok();
+                let mut out: String<256> = String::new();
+                let datetime = DateTime::new(cx.local.rtc.current_time());
+                write!(&mut out, "{}", datetime).unwrap();
+                crate::ui::draw_menu(cx.local.display, cx.local.menu_fsm.state, Some(&out)).ok();
                 cx.local.display.flush().unwrap();
             }
         };

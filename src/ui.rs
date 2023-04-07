@@ -15,7 +15,7 @@ use embedded_graphics::{
 // const CHAR_WIDTH: i32 = 6;
 
 /// This is the principal function that renders all the menu states
-pub fn draw_menu<D>(target: &mut D, state: MenuState) -> Result<(), D::Error>
+pub fn draw_menu<D>(target: &mut D, state: MenuState, msg: Option<&str>) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = BinaryColor>,
 {
@@ -33,30 +33,35 @@ where
 
     // TODO(elsuizo:2021-11-28): could be better some sort of calculation for the place of the
     // menus positions and not hardcoded values...
-    match state {
-        MenuState::Row1(true) => {
+    match (state, msg) {
+        (MenuState::Row1(true), _) => {
             Text::new("--- Menu 1 ---", Point::new(0, 13), background).draw(target)?;
             Text::new("--- Menu 2 ---", Point::new(0, 33), normal).draw(target)?;
             Text::new("--- Menu 3 ---", Point::new(0, 53), normal).draw(target)?;
         }
-        MenuState::Row2(true) => {
+        (MenuState::Row2(true), _) => {
             Text::new("--- Menu 1 ---", Point::new(0, 13), normal).draw(target)?;
             Text::new("--- Menu 2 ---", Point::new(0, 33), background).draw(target)?;
             Text::new("--- Menu 3 ---", Point::new(0, 53), normal).draw(target)?;
         }
-        MenuState::Row3(true) => {
+        (MenuState::Row3(true), _) => {
             Text::new("--- Menu 1 ---", Point::new(0, 13), normal).draw(target)?;
             Text::new("--- Menu 2 ---", Point::new(0, 33), normal).draw(target)?;
             Text::new("--- Menu 3 ---", Point::new(0, 53), background).draw(target)?;
         }
-        MenuState::Row1(false) | MenuState::Row2(false) | MenuState::Row3(false) => {
+        (MenuState::Row1(false), _) | (MenuState::Row2(false), _) | (MenuState::Row3(false), _) => {
             Text::new("--- Menu 1 ---", Point::new(0, 13), normal).draw(target)?;
             Text::new("--- Menu 2 ---", Point::new(0, 33), normal).draw(target)?;
             Text::new("--- Menu 3 ---", Point::new(0, 53), normal).draw(target)?;
         }
-        MenuState::Image => {
+        (MenuState::Image, Some(message)) => {
+            // Image::new(&logo_image, Point::new(32, 0)).draw(target)?;
+            Text::new(message, Point::new(0, 13), normal).draw(target)?;
+        } // MenuState::Clock => {}
+        (MenuState::Image, None) => {
             Image::new(&logo_image, Point::new(32, 0)).draw(target)?;
-        }
+            // Text::new(message, Point::new(0, 13), normal).draw(target)?;
+        } // MenuState::Clock => {}
     }
     Ok(())
 }
@@ -79,6 +84,7 @@ pub enum MenuState {
     Row2(BackgroundFlag),
     Row3(BackgroundFlag),
     Image,
+    // Clock,
 }
 
 impl MenuState {
@@ -112,7 +118,9 @@ impl MenuFSM {
             (Row3(_), Up) => Row2(true),
             (Row3(_), Down) => Row1(true),
             (_, Enter) => Image,
-            (Image, _) => Row1(false),
+            (Image, Down) => Image,
+            (Image, Up) => Image,
+            // (Row1(_), Enter) => Clock,
         }
     }
 }
